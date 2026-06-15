@@ -25,7 +25,7 @@ graph TD
         PuppeteerScraper[Puppeteer Headless Scraper]
     end
 
-    SQLite[(\.getajob\getajob.db)]
+    SQLite[(~/.getajob/getajob.db)]
 
     WebUI --> API_Jobs
     WebUI --> API_Settings
