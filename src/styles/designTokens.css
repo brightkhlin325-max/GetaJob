@@ -1,0 +1,57 @@
+:root {
+  /* Bauhaus primary colors available everywhere */
+  --bauhaus-red: #ff3b30;
+  --bauhaus-blue: #0055b3;
+  --bauhaus-yellow: #ffcc00;
+  --color-accent: #0055b3;
+  
+  --bauhaus-red-grad: linear-gradient(135deg, #ff6b6b 0%, #ff3b30 100%);
+  --bauhaus-blue-grad: linear-gradient(135deg, #5c8fbb 0%, #0055b3 100%);
+  --bauhaus-yellow-grad: linear-gradient(135deg, #ffd166 0%, #ffcc00 100%);
+
+  /* Light theme */
+  --color-bg: #f5f5f0; /* Creamy off-white paper background */
+  --color-primary: #1a1a1a;
+  --color-secondary: #4a4a4a;
+  
+  --glass-bg: #ffffff;
+  --glass-blur: none;
+  --glass-border: #1a1a1a;
+  --glass-shadow: 5px 5px 0px #1a1a1a; /* Solid offset shadow */
+  --font-base: 'Outfit', 'Montserrat', -apple-system, sans-serif;
+  --radius: 8px;
+  --transition-fast: all 0.2s ease;
+  --text-primary: #1a1a1a;
+}
+
+.dark {
+  /* Dark theme */
+  --color-bg: #121212;
+  --color-primary: #f8fafc;
+  --color-secondary: #94a3b8;
+  --color-accent: #5c8fbb;
+  --glass-bg: #1e1e1e;
+  --glass-border: #f8fafc;
+  --glass-shadow: 5px 5px 0px #f8fafc;
+  --text-primary: #f8fafc;
+}
+
+body {
+  background-color: var(--color-bg);
+  background-image: 
+    linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px; /* Square grid pattern */
+  font-family: var(--font-base);
+  color: var(--text-primary);
+  margin: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease;
+}
+
+.dark body {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}

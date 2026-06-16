@@ -1,0 +1,23 @@
+{
+  "name": "John Doe",
+  "contact": {
+    "email": "john@example.com",
+    "phone": "+886912345"
+  },
+  "education": [
+    {
+      "school": "NTU",
+      "degree": "CS",
+      "grad_year": 2024
+    }
+  ],
+  "experience": [
+    {
+      "company": "Tech Inc",
+      "role": "React Intern",
+      "duration": "1 year",
+      "description": "React code"
+    }
+  ],
+  "skills": ["React", "TypeScript", "TailwindCSS"]
+}

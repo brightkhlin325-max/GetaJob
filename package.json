@@ -1,0 +1,49 @@
+{
+  "name": "getajob",
+  "version": "1.0.0",
+  "description": "AI-driven job search assistant",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --ext .js,.ts,.tsx",
+    "format": "prettier --write .",
+    "test": "jest",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@heroicons/react": "^2.2.0",
+    "multer": "^1.4.5-lts.1",
+    "next": "^14.2.3",
+    "next-connect": "^0.13.0",
+    "pdf-parse": "^1.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "@testing-library/jest-dom": "^6.4.5",
+    "@testing-library/react": "^15.0.7",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "autoprefixer": "^10.4.19",
+    "better-sqlite3": "^12.10.1",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^9",
+    "eslint-plugin-react": "^7",
+    "express": "^4.19.2",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "node-mocks-http": "^1.13.0",
+    "postcss": "^8.4.38",
+    "prettier": "^3",
+    "tailwindcss": "^3.4.3",
+    "ts-jest": "^29",
+    "typescript": "^5.5.0"
+  },
+  "allowScripts": {
+    "sqlite3@5.1.7": true
+  }
+}

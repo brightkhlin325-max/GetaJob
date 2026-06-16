@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root {
+      --bauhaus-red: #ff3b30;
+      --bauhaus-blue: #0055b3;
+      --bauhaus-yellow: #ffcc00;
+      --color-accent: #0055b3;
+      
+      --color-bg: #f5f5f0; /* Cream paper background */
+      --text-color: #1a1a1a;
+      --text-muted: #555555;
+    }
+
+    body {
+      width: 320px;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--color-bg);
+      background-image: 
+        linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+      background-size: 16px 16px; /* Square grid pattern */
+      color: var(--text-color);
+      padding: 1.25rem;
+      box-sizing: border-box;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-bottom: 1rem;
+    }
+
+    .logo-text {
+      font-size: 1.35rem;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      color: #1a1a1a;
+    }
+
+    .container {
+      background: #ffffff;
+      border: 2px solid #1a1a1a;
+      box-shadow: 4px 4px 0px #1a1a1a; /* Offset solid shadow */
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      box-sizing: border-box;
+    }
+
+    .title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 1.2rem;
+      word-break: break-all;
+    }
+
+    .btn {
+      width: 100%;
+      background: var(--color-accent);
+      color: #ffffff;
+      border: 2px solid #1a1a1a;
+      box-shadow: 2px 2px 0px #1a1a1a;
+      padding: 0.65rem;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.1s ease;
+      box-sizing: border-box;
+    }
+
+    .btn:hover {
+      transform: translate(-1px, -1px);
+      box-shadow: 3px 3px 0px #1a1a1a;
+      background: var(--bauhaus-red);
+    }
+
+    .btn:disabled {
+      background: #e2e8f0;
+      color: #94a3b8;
+      border-color: #cbd5e1;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 0.75rem;
+      font-size: 0.8rem;
+      min-height: 1.2rem;
+      font-weight: 700;
+    }
+
+    .status.success {
+      color: var(--color-accent);
+    }
+
+    .status.error {
+      color: var(--bauhaus-red);
+    }
+
+    .status.loading {
+      color: var(--color-accent);
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div style="display: flex; gap: 2px; align-items: flex-end; margin-right: 0.3rem;">
+      <div style="width: 8px; height: 16px; background: var(--bauhaus-red); border-radius: 4px 0 0 4px;"></div>
+      <div style="width: 8px; height: 8px; background: var(--bauhaus-yellow); border-radius: 50%;"></div>
+      <div style="width: 8px; height: 20px; background: var(--color-accent); border-radius: 0 4px 4px 0;"></div>
+    </div>
+    <span class="logo-text">GetaJob</span>
+  </div>
+  <div class="container">
+    <div id="job-info">
+      <h3 class="title" id="page-title">正在偵測職缺網頁...</h3>
+      <p class="subtitle" id="page-url">讀取中...</p>
+    </div>
+    <button class="btn" id="scrape-btn" disabled>匯入至 GetaJob</button>
+    <div class="status" id="status-msg"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

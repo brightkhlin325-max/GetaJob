@@ -1,0 +1,23 @@
+{
+  "name": "Sarah Python",
+  "contact": {
+    "email": "sarah@example.com",
+    "phone": "+886987654"
+  },
+  "education": [
+    {
+      "school": "NTNU",
+      "degree": "CSIE",
+      "grad_year": 2023
+    }
+  ],
+  "experience": [
+    {
+      "company": "Python Labs",
+      "role": "Django Developer",
+      "duration": "2 years",
+      "description": "Django APIs"
+    }
+  ],
+  "skills": ["Python", "Django", "SQL", "PostgreSQL"]
+}

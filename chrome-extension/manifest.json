@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "GetaJob Chrome Extension",
+  "description": "Capture job posting info and send to local GetaJob server.",
+  "version": "1.0",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["http://localhost:3000/*", "http://localhost:3001/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.linkedin.com/*",
+        "*://*.indeed.com/*",
+        "*://*.glassdoor.com/*",
+        "*://*.104.com.tw/*",
+        "*://*.cakeresume.com/*",
+        "*://*.cake.me/*",
+        "*://*.1111.com.tw/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

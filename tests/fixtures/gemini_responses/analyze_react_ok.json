@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "match_score": 90,
+  "match_analysis": {
+    "advantages": [
+      "Proficient in React",
+      "TypeScript experience match"
+    ],
+    "gaps": [
+      "No backend node experience listed"
+    ]
+  }
+}

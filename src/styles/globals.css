@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Bauhaus Art Gallery Background Shapes (from image 3) */
+.bg-glow-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.bg-glow-sphere {
+  position: absolute;
+  opacity: 0.08; /* Subdued background elements to keep text legible */
+  transition: all 1s ease-in-out;
+}
+
+.dark .bg-glow-sphere {
+  opacity: 0.04;
+}
+
+.sphere-red {
+  background: var(--bauhaus-red);
+  width: 450px;
+  height: 450px;
+  border-radius: 50%; /* Red Circle */
+  top: 15%;
+  left: 5%;
+}
+
+.sphere-yellow {
+  /* Yellow Triangle shape using clip-path for robust cross-browser rendering */
+  background: var(--bauhaus-yellow);
+  width: 400px;
+  height: 400px;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  bottom: 5%;
+  right: 5%;
+}
+
+.sphere-blue {
+  background: var(--bauhaus-blue);
+  width: 420px;
+  height: 380px;
+  transform: rotate(12deg); /* Tilted Blue Square */
+  top: -5%;
+  left: 45%;
+}
+
+/* Crisp Bauhaus Card & UI Styles */
+.glass-card {
+  background: var(--glass-bg);
+  border: 2px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius);
+  transition: var(--transition-fast);
+  padding: 1.25rem;
+}
+
+.glass-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0px var(--glass-border);
+}
+
+.glass-btn {
+  background: var(--glass-bg);
+  border: 2px solid var(--glass-border);
+  box-shadow: 3px 3px 0px var(--glass-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  padding: 0.5rem 1rem;
+  font-weight: 700;
+  transition: var(--transition-fast);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.glass-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0px var(--glass-border);
+  background: var(--color-accent);
+  color: #fff;
+}
+
+/* Styled text links for Job Card Titles */
+.job-title-link {
+  transition: var(--transition-fast);
+  position: relative;
+  display: inline-block;
+  font-weight: 800;
+}
+
+.job-title-link:hover {
+  color: var(--color-accent) !important;
+}
+
+.job-title-link::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  transform: scaleX(0);
+  height: 3px;
+  bottom: -2px;
+  left: 0;
+  background-color: var(--color-accent);
+  transform-origin: bottom right;
+  transition: transform 0.2s ease-out;
+}
+
+.job-title-link:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+/* Dropdown Select elements styling */
+select {
+  background-color: #2e303f !important;
+  color: #ffffff !important;
+  border: 2px solid var(--glass-border) !important;
+  font-weight: 600;
+}
+
+/* Inputs styling */
+input, textarea {
+  border: 2px solid var(--glass-border) !important;
+  transition: var(--transition-fast);
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
