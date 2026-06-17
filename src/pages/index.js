@@ -46,6 +46,9 @@ export default function Dashboard() {
   // Selected details for modals
   const [selectedJobForAnalysis, setSelectedJobForAnalysis] = useState(null);
   const [selectedJobForLetter, setSelectedJobForLetter] = useState(null);
+  const [selectedJobForDetails, setSelectedJobForDetails] = useState(null);
+  const [showRawDescription, setShowRawDescription] = useState(false);
+  const [isFormatting, setIsFormatting] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [coverLetterText, setCoverLetterText] = useState('');
@@ -194,6 +197,27 @@ export default function Dashboard() {
       setSwipeIndex((prev) => prev + 1);
       setSwipeAction(null);
     }, 250);
+  };
+
+  // Job Details & Formatting
+  const handleFormatJob = async (jobId) => {
+    setIsFormatting(true);
+    try {
+      const res = await fetch(`/api/jobs/${jobId}/format`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success && data.data.ai_summary) {
+        setSelectedJobForDetails(prev => ({ ...prev, ai_summary: data.data.ai_summary }));
+        setJobs(prev => prev.map(j => j.id === jobId ? { ...j, ai_summary: data.data.ai_summary } : j));
+        setShowRawDescription(false);
+      } else {
+        alert(data.error || 'AI 排版失敗，請稍後再試。');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('發生網路錯誤，請稍後再試。');
+    } finally {
+      setIsFormatting(false);
+    }
   };
 
   // Resume Actions
@@ -859,6 +883,7 @@ export default function Dashboard() {
                             onDelete={() => handleDeleteJob(job.id)}
                             onAnalyze={triggerJobAnalysis}
                             onViewCoverLetter={triggerCoverLetter}
+                            onViewDetails={(job) => setSelectedJobForDetails(job)}
                             onStatusChange={handleStatusChange}
                           />
                         ))}
@@ -886,6 +911,7 @@ export default function Dashboard() {
                             onDelete={() => handleDeleteJob(job.id)}
                             onAnalyze={triggerJobAnalysis}
                             onViewCoverLetter={triggerCoverLetter}
+                            onViewDetails={(job) => setSelectedJobForDetails(job)}
                             onStatusChange={handleStatusChange}
                           />
                         ))}
@@ -919,6 +945,59 @@ export default function Dashboard() {
             <button onClick={handleSaveJob} className="glass-btn" style={{ background: 'var(--color-accent)', color: '#fff', fontWeight: '700', padding: '0.6rem' }}>
               儲存職缺
             </button>
+          </div>
+        </Modal>
+      )}
+
+      {/* Job Details Modal */}
+      {selectedJobForDetails && (
+        <Modal title={selectedJobForDetails.title} onClose={() => { setSelectedJobForDetails(null); setShowRawDescription(false); }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', minWidth: '300px' }}>
+            <div>
+              <p style={{ margin: '0 0 0.5rem 0', color: 'var(--color-secondary)', fontSize: '1rem', fontWeight: '600' }}>
+                🏢 {selectedJobForDetails.company}
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                {selectedJobForDetails.location && <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>📍 {selectedJobForDetails.location}</span>}
+                {selectedJobForDetails.salary && <span style={{ fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', padding: '0.15rem 0.45rem', borderRadius: '4px' }}>💰 {selectedJobForDetails.salary}</span>}
+              </div>
+            </div>
+
+            {/* AI Summary vs Raw Description Toggle */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-0.5rem' }}>
+              {selectedJobForDetails.ai_summary ? (
+                <button
+                  onClick={() => setShowRawDescription(!showRawDescription)}
+                  style={{ background: 'none', border: '1px solid var(--color-accent)', color: 'var(--color-accent)', cursor: 'pointer', padding: '0.2rem 0.6rem', borderRadius: '4px', fontSize: '0.8rem' }}
+                >
+                  {showRawDescription ? '✨ 查看 AI 重點整理' : '📄 查看原始描述'}
+                </button>
+              ) : selectedJobForDetails.description && selectedJobForDetails.description.length > 150 ? (
+                <button
+                  onClick={() => handleFormatJob(selectedJobForDetails.id)}
+                  disabled={isFormatting}
+                  style={{ background: 'var(--color-accent)', border: 'none', color: '#fff', cursor: isFormatting ? 'not-allowed' : 'pointer', padding: '0.4rem 0.8rem', borderRadius: '4px', fontSize: '0.85rem', fontWeight: 'bold' }}
+                >
+                  {isFormatting ? '✨ AI 處理中...' : '✨ 讓 AI 重整排版'}
+                </button>
+              ) : null}
+            </div>
+
+            <div style={{ 
+              overflowY: 'auto', 
+              paddingRight: '1rem',
+              fontSize: '1.05rem',
+              lineHeight: '1.8',
+              color: 'var(--text-primary)',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              letterSpacing: '0.02em',
+              maxHeight: '55vh'
+            }}>
+              {showRawDescription || !selectedJobForDetails.ai_summary
+                ? (selectedJobForDetails.description || '無詳細工作描述。')
+                : selectedJobForDetails.ai_summary}
+            </div>
           </div>
         </Modal>
       )}

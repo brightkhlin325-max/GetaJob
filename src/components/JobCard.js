@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { PencilIcon, TrashIcon, SparklesIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 
-export default function JobCard({ job, onEdit, onDelete, onAnalyze, onViewCoverLetter, viewMode = 'grid', onStatusChange }) {
+export default function JobCard({ job, onEdit, onDelete, onAnalyze, onViewCoverLetter, onViewDetails, viewMode = 'grid', onStatusChange }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
@@ -132,7 +132,8 @@ export default function JobCard({ job, onEdit, onDelete, onAnalyze, onViewCoverL
   }
 
   return (
-    <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+    <React.Fragment>
+      <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
           {/* Clickable Job Title Link */}
@@ -218,7 +219,7 @@ export default function JobCard({ job, onEdit, onDelete, onAnalyze, onViewCoverL
         {job.description && (
           <div style={{ marginTop: '0.6rem' }}>
             <button
-              onClick={() => setIsExpanded(!isExpanded)}
+              onClick={() => onViewDetails && onViewDetails(job)}
               style={{
                 background: 'none',
                 border: 'none',
@@ -233,26 +234,8 @@ export default function JobCard({ job, onEdit, onDelete, onAnalyze, onViewCoverL
                 outline: 'none'
               }}
             >
-              <span>{isExpanded ? '▼ 收合工作描述' : '▶ 展開工作描述'}</span>
+              <span>▶ 展開工作描述</span>
             </button>
-            {isExpanded && (
-              <div style={{
-                marginTop: '0.5rem',
-                padding: '0.6rem',
-                background: 'var(--color-bg)',
-                borderRadius: '6px',
-                border: '1px solid var(--glass-border)',
-                fontSize: '0.85rem',
-                color: 'var(--text-primary)',
-                maxHeight: '180px',
-                overflowY: 'auto',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-all',
-                lineHeight: '1.5'
-              }}>
-                {job.description}
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -308,5 +291,6 @@ export default function JobCard({ job, onEdit, onDelete, onAnalyze, onViewCoverL
         </div>
       </div>
     </div>
+    </React.Fragment>
   );
 }

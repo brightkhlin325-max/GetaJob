@@ -54,6 +54,12 @@ function initializeSchema(database) {
     CREATE INDEX IF NOT EXISTS idx_job_analyses_job_id ON job_analyses(job_id);
     CREATE INDEX IF NOT EXISTS idx_job_analyses_resume_id ON job_analyses(resume_id);
   `);
+
+  try {
+    database.exec(`ALTER TABLE jobs ADD COLUMN ai_summary TEXT;`);
+  } catch (err) {
+    // Ignore if column already exists
+  }
 }
 
 /**

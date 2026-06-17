@@ -1,4 +1,5 @@
 import db from '../../lib/db';
+import { processJobSummaryAsync } from '../../lib/services/jobService';
 
 const ALLOWED_STATUSES = ['Interested', 'Applied', 'Interviewing', 'Offered', 'Rejected'];
 
@@ -81,6 +82,12 @@ export default async function handler(req, res) {
         finalStatus
       );
 
+      if (description) {
+        setTimeout(() => {
+          processJobSummaryAsync(result.lastInsertRowid, description);
+        }, 0);
+      }
+
       return res.status(201).json({ success: true, jobId: result.lastInsertRowid });
 
     } else if (req.method === 'PUT') {
@@ -153,6 +160,12 @@ export default async function handler(req, res) {
       values.push(id);
       const stmt = db.prepare(`UPDATE jobs SET ${updates.join(', ')} WHERE id = ?`);
       await stmt.run(...values);
+
+      if (description !== undefined) {
+        setTimeout(() => {
+          processJobSummaryAsync(id, description);
+        }, 0);
+      }
 
       return res.status(200).json({ success: true });
 
