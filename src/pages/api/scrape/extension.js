@@ -43,6 +43,20 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (payload.checkOnly) {
+      if (url) {
+        const exists = db.prepare('SELECT 1 FROM jobs WHERE url = ?').get(url);
+        return res.status(200).json({ success: true, duplicated: !!exists });
+      }
+      return res.status(200).json({ success: true, duplicated: false });
+    }
+
+    if (url) {
+      const exists = db.prepare('SELECT 1 FROM jobs WHERE url = ?').get(url);
+      if (exists) {
+        return res.status(200).json({ success: true, message: 'Already exists', duplicated: true });
+      }
+    }
     const stmt = db.prepare(`INSERT INTO jobs (title, company, location, salary, url, description, source) VALUES (?, ?, ?, ?, ?, ?, ?)`);
     const info = stmt.run(title, company, location, salary, url, description, source);
     const jobId = info.lastInsertRowid;

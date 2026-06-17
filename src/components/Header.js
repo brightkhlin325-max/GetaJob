@@ -1,9 +1,12 @@
 import React, { useContext } from 'react';
 import { ThemeContext } from '../context/ThemeContext';
+import { LanguageContext } from '../context/LanguageContext';
 import Link from 'next/link';
 
 export default function Header() {
   const { darkMode, toggleDarkMode } = useContext(ThemeContext);
+  const { t } = useContext(LanguageContext);
+  
   return (
     <header
       style={{
@@ -21,7 +24,7 @@ export default function Header() {
         transition: 'var(--transition-fast)'
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+      <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
         {/* Geometric Bauhaus Logo Mark */}
         <div style={{ display: 'flex', gap: '2px', alignItems: 'flex-end', marginRight: '0.5rem' }}>
           <div style={{ width: '12px', height: '24px', background: 'var(--bauhaus-red)', borderRadius: '6px 0 0 6px' }}></div>
@@ -31,10 +34,10 @@ export default function Header() {
         <span style={{ fontSize: '1.6rem', fontWeight: '900', letterSpacing: '-0.05em', background: 'linear-gradient(to right, var(--text-primary), var(--color-accent))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontFamily: 'var(--font-base)' }}>
           GetaJob
         </span>
-      </div>
+      </Link>
       <nav>
-        <Link href="/" style={{ marginRight: '1rem', color: 'var(--text-primary)', fontWeight: '600' }}>首頁</Link>
-        <Link href="/settings" style={{ marginRight: '1rem', color: 'var(--text-primary)', fontWeight: '600' }}>設定</Link>
+        <Link href="/" style={{ marginRight: '1rem', color: 'var(--text-primary)', fontWeight: '600', textDecoration: 'none' }}>{t('home')}</Link>
+        <Link href="/settings" style={{ marginRight: '1rem', color: 'var(--text-primary)', fontWeight: '600', textDecoration: 'none' }}>{t('settings')}</Link>
         <button
           onClick={toggleDarkMode}
           style={{

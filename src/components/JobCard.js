@@ -231,16 +231,16 @@ export default function JobCard({ job, onEdit, onDelete, onAnalyze, onViewCoverL
               <div style={{
                 marginTop: '0.5rem',
                 padding: '0.6rem',
-                background: 'rgba(0,0,0,0.2)',
+                background: 'var(--color-bg)',
                 borderRadius: '6px',
                 border: '1px solid var(--glass-border)',
-                fontSize: '0.8rem',
-                color: 'var(--color-secondary)',
-                maxHeight: '150px',
+                fontSize: '0.85rem',
+                color: 'var(--text-primary)',
+                maxHeight: '180px',
                 overflowY: 'auto',
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-all',
-                lineHeight: '1.4'
+                lineHeight: '1.5'
               }}>
                 {job.description}
               </div>

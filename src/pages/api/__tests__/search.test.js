@@ -107,10 +107,20 @@ describe('/api/scrape/search Joint Scraper API Endpoint', () => {
 
     await searchHandler(req, res);
 
-    expect(res._getStatusCode()).toBe(200);
+    expect(res._getStatusCode()).toBe(202);
     const body = res._getJSONData();
     expect(body.success).toBe(true);
-    expect(body.count).toBe(4); // 1 job from each platform
+    expect(body.taskId).toBeDefined();
+
+    const taskId = body.taskId;
+    // Wait for background job to finish in Jest event loop
+    let retries = 20;
+    while (retries > 0 && global.scrapeTasks[taskId]?.status === 'processing') {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      retries--;
+    }
+
+    expect(global.scrapeTasks[taskId]?.status).toBe('completed');
 
     // Verify written to database
     const jobs = db.prepare('SELECT * FROM jobs').all();

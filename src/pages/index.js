@@ -1,19 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext } from 'react';
 import Head from 'next/head';
 import Header from '../components/Header';
 import JobCard from '../components/JobCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Modal from '../components/Modal';
+import { LanguageContext } from '../context/LanguageContext';
 
 export default function Dashboard() {
+  const { language, t } = useContext(LanguageContext);
   const [jobs, setJobs] = useState([]);
   const [resumes, setResumes] = useState([]);
-  const [settings, setSettings] = useState({ 
-    ai_provider: 'gemini',
-    gemini_api_key: '', 
-    openai_api_key: '', 
-    anthropic_api_key: '' 
-  });
   const [loading, setLoading] = useState(true);
   
   // Modals state
@@ -60,15 +56,65 @@ export default function Dashboard() {
   const [swipeIndex, setSwipeIndex] = useState(0);
   const [swipeAction, setSwipeAction] = useState(null); // 'left', 'right', or null
   const [aiFilterEnabled, setAiFilterEnabled] = useState(false);
+  const [targetPosition, setTargetPosition] = useState('');
+  const [targetLocations, setTargetLocations] = useState(['台北市', '新北市']);
 
-  // Fetch initial data
+  // Fetch initial data and listen to extension messages
   useEffect(() => {
     Promise.all([
       fetchJobs(),
       fetchResumes(),
-      fetchSettings()
+      fetchPreferences()
     ]).finally(() => setLoading(false));
+
+    const handleExtensionMessage = (event) => {
+      if (event.data && event.data.type === 'GETAJOB_JOB_IMPORTED') {
+        fetchJobs();
+      }
+    };
+    window.addEventListener('message', handleExtensionMessage);
+    return () => window.removeEventListener('message', handleExtensionMessage);
   }, []);
+
+  const fetchPreferences = async () => {
+    try {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      if (data) {
+        if (data.target_position) setTargetPosition(data.target_position);
+        if (data.target_locations) {
+          try {
+            setTargetLocations(JSON.parse(data.target_locations));
+          } catch (e) {
+            setTargetLocations(data.target_locations.split(','));
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch preferences', e);
+    }
+  };
+
+  const handleSavePreferences = async () => {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_position: targetPosition,
+          target_locations: JSON.stringify(targetLocations)
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(t('zh' === language ? '求職偏好已儲存！' : 'Job preferences saved!'));
+      } else {
+        alert('Failed to save preferences');
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchJobs = async () => {
     try {
@@ -85,23 +131,6 @@ export default function Dashboard() {
       const res = await fetch('/api/resumes');
       const data = await res.json();
       if (data.success) setResumes(data.data);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const fetchSettings = async () => {
-    try {
-      const res = await fetch('/api/settings');
-      const data = await res.json();
-      if (data) {
-        setSettings({
-          ai_provider: data.ai_provider || 'gemini',
-          gemini_api_key: data.gemini_api_key || '',
-          openai_api_key: data.openai_api_key || '',
-          anthropic_api_key: data.anthropic_api_key || ''
-        });
-      }
     } catch (e) {
       console.error(e);
     }
@@ -199,54 +228,9 @@ export default function Dashboard() {
     }
   };
 
-  // Settings Action
-  const handleSaveSettings = async () => {
-    const res = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
-    });
-    const data = await res.json();
-    if (data.success) {
-      alert('設定儲存成功！');
-    } else {
-      alert('設定儲存失敗');
-    }
-  };
-
-  // Joint Multi-Platform Scraper Action
-  const handleScrapeJobs = async () => {
-    if (!scraperKeyword.trim()) return;
-    if (selectedPlatforms.length === 0) {
-      alert('請至少選擇一個平台進行爬取。');
-      return;
-    }
-    setScraperLoading(true);
-    try {
-      const res = await fetch('/api/scrape/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          keyword: scraperKeyword,
-          platforms: selectedPlatforms,
-          location: searchLocation,
-          aiFilter: aiFilterEnabled
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(`成功從 ${selectedPlatforms.join(', ')} 爬取並匯入 ${data.count} 筆職缺！`);
-        setScraperKeyword('');
-        fetchJobs();
-      } else {
-        alert(data.error || '爬取職缺失敗');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('搜尋職缺時發生錯誤');
-    } finally {
-      setScraperLoading(false);
-    }
+  // Joint Multi-Platform Scraper Action (Deprecated on Web, moved to Extension)
+  const handleScrapeJobs = () => {
+    alert(t('zh' === language ? '請打開 GetaJob 瀏覽器擴充功能開始抓取職缺！' : 'Please open GetaJob Chrome Extension to start scraping!'));
   };
 
   // AI Keyword Planning Action
@@ -411,24 +395,31 @@ export default function Dashboard() {
           /* Dual-column Art Gallery Layout */
           <div className="main-layout" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem', marginTop: '2rem' }}>
             
-            {/* Left Column: Side Control Panel (Resume, Settings, Scraper) */}
+            {/* Left Column: Side Control Panel (Resume, Scraper) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignSelf: 'start' }}>
               
               {/* Resumes Panel */}
               <div className="glass-card" style={{ borderLeft: '4px solid var(--color-accent)' }}>
                 <h2 style={{ fontSize: '1.2rem', marginTop: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>📄</span> 履歷管理
+                  <span>📄</span> {t('resumeTitle')}
                 </h2>
                 
                 <div style={{ marginBottom: '1rem', marginTop: '1rem' }}>
-                  <label className="glass-btn" style={{ display: 'block', textAlign: 'center', width: '100%', boxSizing: 'border-box' }}>
-                    {resumeUploading ? '解析履歷中...' : '＋ 上傳 PDF / 文字履歷'}
+                  <label className="glass-btn" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%', boxSizing: 'border-box', cursor: resumeUploading ? 'not-allowed' : 'pointer' }}>
+                    {resumeUploading ? (
+                      <>
+                        <span className="spinner-inline"></span>
+                        <span>{t('parsingResume')}</span>
+                      </>
+                    ) : (
+                      t('uploadResume')
+                    )}
                     <input type="file" accept=".pdf,.txt" onChange={handleResumeUpload} disabled={resumeUploading} style={{ display: 'none' }} />
                   </label>
                 </div>
 
                 {resumes.length === 0 ? (
-                  <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--color-secondary)' }}>尚未上傳履歷。</p>
+                  <p style={{ fontStyle: 'italic', fontSize: '0.85rem', color: 'var(--color-secondary)' }}>{t('noResume')}</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '0.2rem' }}>
                     {resumes.map(r => (
@@ -443,10 +434,10 @@ export default function Dashboard() {
                         <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                           {!r.is_active && (
                             <button onClick={() => handleSetActiveResume(r.id)} style={{ fontSize: '0.7rem', cursor: 'pointer', padding: '0.15rem 0.35rem', borderRadius: '4px', border: '2px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--text-primary)', fontWeight: '700' }}>
-                              啟用
+                              {t('activeResume')}
                             </button>
                           )}
-                          <button onClick={() => handleDeleteResume(r.id)} style={{ width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', cursor: 'pointer', borderRadius: '4px', border: '2px solid var(--glass-border)', background: 'var(--bauhaus-red)', color: '#fff', padding: 0 }} title="刪除履歷">
+                          <button onClick={() => handleDeleteResume(r.id)} style={{ width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', cursor: 'pointer', borderRadius: '4px', border: '2px solid var(--glass-border)', background: 'var(--bauhaus-red)', color: '#fff', padding: 0 }} title={t('deleteResume')}>
                             ✕
                           </button>
                         </div>
@@ -456,178 +447,83 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Multi-Platform Scraper Panel */}
+              {/* Job Preferences Panel */}
               <div className="glass-card" style={{ borderLeft: '4px solid var(--bauhaus-yellow)' }}>
                 <h2 style={{ fontSize: '1.2rem', marginTop: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>🔍</span> 多平台職缺爬蟲
+                  <span>🎯</span> {t('zh' === language ? '求職偏好' : 'Job Preferences')}
                 </h2>
                 
-                {/* AI Keyword Planner Assistant Section */}
-                <div style={{ background: 'rgba(0,0,0,0.04)', padding: '0.75rem', borderRadius: '6px', border: '2px solid var(--glass-border)', marginTop: '0.75rem', marginBottom: '0.75rem' }}>
-                  <h4 style={{ margin: '0 0 0.4rem 0', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: '800' }}>
-                    <span>💡</span> AI 關鍵字規劃助理
-                  </h4>
-                  <textarea
-                    placeholder="用自然語言輸入想法，例如：想找 PM，要綠能/硬體整合、有 5 年經驗..."
-                    value={aiKeywordQuery}
-                    onChange={(e) => setAiKeywordQuery(e.target.value)}
-                    rows={2}
-                    style={{ width: '100%', padding: '0.35rem 0.5rem', borderRadius: '4px', border: '2px solid var(--glass-border)', background: 'var(--glass-bg)', fontSize: '0.75rem', color: 'var(--text-primary)', boxSizing: 'border-box', outline: 'none', resize: 'none' }}
-                  />
-                  <button
-                    onClick={handlePlanKeywords}
-                    disabled={isPlanningKeywords}
-                    className="glass-btn"
-                    style={{ width: '100%', fontSize: '0.75rem', padding: '0.35rem', marginTop: '0.4rem', border: '2px solid var(--glass-border)', boxShadow: '2px 2px 0px var(--glass-border)' }}
-                  >
-                    {isPlanningKeywords ? 'AI 分析中...' : 'AI 規劃關鍵字'}
-                  </button>
-                  
-                  {aiPlanResult && (
-                    <div style={{ marginTop: '0.6rem', fontSize: '0.75rem', borderTop: '1px dashed var(--glass-border)', paddingTop: '0.5rem' }}>
-                      <p style={{ margin: '0 0 0.3rem 0', fontWeight: '800', color: 'var(--color-accent)' }}>🎯 AI 建議與分析：</p>
-                      <p style={{ margin: '0 0 0.5rem 0', color: 'var(--color-secondary)', lineHeight: '1.4' }}>{aiPlanResult.explanation}</p>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem', margin: '0.4rem 0' }}>
-                        {aiPlanResult.keywords?.map((kw, idx) => (
-                          <span
-                            key={idx}
-                            onClick={() => setScraperKeyword(kw)}
-                            style={{ background: 'var(--bauhaus-yellow)', border: '2px solid var(--glass-border)', padding: '0.15rem 0.45rem', borderRadius: '4px', cursor: 'pointer', fontWeight: '800', fontSize: '0.7rem' }}
-                            title="點擊帶入此搜尋關鍵字"
-                          >
-                            🔑 {kw}
-                          </span>
-                        ))}
-                      </div>
-                      {aiPlanResult.suggestedFilters && (
-                        <p style={{ margin: '0', color: 'var(--color-secondary)', fontSize: '0.7rem' }}>
-                          📌 建議產業：<strong>{aiPlanResult.suggestedFilters.industry}</strong>
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    {/* Location Select */}
-                    <select
-                      value={searchLocation}
-                      onChange={(e) => setSearchLocation(e.target.value)}
-                      style={{ padding: '0.4rem 0.5rem', borderRadius: 'var(--radius)', border: '2px solid var(--glass-border)', background: '#2e303f', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }}
-                    >
-                      <option value="taipei_both">雙北市</option>
-                      <option value="taipei">台北市</option>
-                      <option value="new_taipei">新北市</option>
-                      <option value="global">全球</option>
-                    </select>
-
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '1rem' }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '800', display: 'block', marginBottom: '0.35rem' }}>
+                      {t('zh' === language ? '目標職位 *' : 'Target Position *')}
+                    </label>
                     <input
-                      placeholder="關鍵字，如：前端工程師"
-                      value={scraperKeyword}
-                      onChange={(e) => setScraperKeyword(e.target.value)}
-                      style={{ flex: 1, padding: '0.4rem 0.6rem', borderRadius: 'var(--radius)', border: '2px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--text-primary)', fontSize: '0.85rem', outline: 'none' }}
+                      placeholder="例如：PM / 產品經理"
+                      value={targetPosition}
+                      onChange={(e) => setTargetPosition(e.target.value)}
+                      style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius)', border: '2px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box', outline: 'none' }}
                     />
                   </div>
-                  
-                  <button onClick={handleScrapeJobs} disabled={scraperLoading} className="glass-btn" style={{ width: '100%', marginTop: '0.25rem' }}>
-                    {scraperLoading ? '正在爬取職缺細節中...' : '開始爬取職缺'}
+
+                  <div>
+                    <label style={{ fontSize: '0.8rem', fontWeight: '800', display: 'block', marginBottom: '0.35rem' }}>
+                      {t('zh' === language ? '搜尋地點 (可複選)' : 'Search Locations')}
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem', padding: '0.5rem', background: 'rgba(0,0,0,0.1)', borderRadius: '6px', maxHeight: '180px', overflowY: 'auto' }}>
+                      {['台灣 (不限縣市)', '台北市', '新北市', '桃園市', '台中市', '台南市', '高雄市', '基隆市', '新竹市', '苗栗縣', '彰化縣', '南投縣', '雲林縣', '嘉義市', '屏東縣', '宜蘭縣', '花蓮縣', '台東縣'].map(loc => {
+                        const isChecked = targetLocations.includes(loc);
+                        return (
+                          <label key={loc} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer', fontSize: '0.75rem', userSelect: 'none' }}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                if (isChecked) {
+                                  setTargetLocations(targetLocations.filter(l => l !== loc));
+                                } else {
+                                  setTargetLocations([...targetLocations, loc]);
+                                }
+                              }}
+                              style={{ cursor: 'pointer' }}
+                            />
+                            {loc}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <button onClick={handleSavePreferences} className="glass-btn" style={{ width: '100%', marginTop: '0.25rem', background: 'var(--color-accent)', color: '#fff' }}>
+                    {t('zh' === language ? '儲存偏好' : 'Save Preferences')}
                   </button>
-                </div>
-
-                {/* Platforms Grid Checkboxes */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '1rem', padding: '0.5rem', background: 'rgba(0,0,0,0.1)', borderRadius: '6px' }}>
-                  {['104', 'Cake', 'LinkedIn', '1111'].map(platform => {
-                    const val = platform === 'Cake' ? 'cakeresume' : platform.toLowerCase();
-                    const isChecked = selectedPlatforms.includes(val);
-                    return (
-                      <label key={platform} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.8rem', userSelect: 'none' }}>
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {
-                            if (isChecked) {
-                              setSelectedPlatforms(selectedPlatforms.filter(p => p !== val));
-                            } else {
-                              setSelectedPlatforms([...selectedPlatforms, val]);
-                            }
-                          }}
-                          style={{ cursor: 'pointer' }}
-                        />
-                        {platform}
-                      </label>
-                    );
-                  })}
-                </div>
-
-                {/* AI Relevance Filter Option */}
-                <div style={{ marginTop: '0.75rem', padding: '0.5rem', background: 'rgba(129, 140, 248, 0.08)', borderRadius: '6px', border: '1px solid rgba(129, 140, 248, 0.2)' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '800', color: '#818cf8', userSelect: 'none' }}>
-                    <input
-                      type="checkbox"
-                      checked={aiFilterEnabled}
-                      onChange={(e) => setAiFilterEnabled(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    🤖 啟用 AI 相關性過濾 (自動過濾無關職缺)
-                  </label>
                 </div>
               </div>
 
-              {/* Multi-Provider AI Settings Panel */}
-              <div className="glass-card" style={{ borderLeft: '4px solid var(--bauhaus-red)' }}>
-                <h2 style={{ fontSize: '1.2rem', marginTop: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span>⚙️</span> AI 服務整合設定
-                </h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1rem' }}>
-                  
+              {/* Extension Usage Instructions */}
+              <div className="glass-card" style={{ borderLeft: '4px solid var(--bauhaus-red)', fontSize: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <h3 style={{ margin: 0, fontSize: '0.9rem', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <span>🔌</span> {t('zh' === language ? '爬蟲使用教學' : 'Scraper Instructions')}
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', lineHeight: '1.4' }}>
                   <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '800', display: 'block', marginBottom: '0.25rem' }}>使用 AI 核心模型</label>
-                    <select
-                      value={settings.ai_provider}
-                      onChange={(e) => setSettings({ ...settings, ai_provider: e.target.value })}
-                      style={{ width: '100%', padding: '0.4rem 0.5rem', borderRadius: 'var(--radius)', border: '2px solid var(--glass-border)', background: '#2e303f', color: '#ffffff', fontSize: '0.8rem', outline: 'none' }}
-                    >
-                      <option value="gemini">Google Gemini (推薦)</option>
-                      <option value="openai">OpenAI ChatGPT</option>
-                      <option value="anthropic">Anthropic Claude</option>
-                    </select>
+                    <strong>1. {t('zh' === language ? '設定求職偏好' : 'Set Preferences')}</strong>
+                    <div style={{ color: 'var(--color-secondary)', fontSize: '0.75rem' }}>
+                      {t('zh' === language ? '在上方填寫「目標職位」與地點，按下「儲存偏好」。' : 'Fill in target position and locations, click "Save".')}
+                    </div>
                   </div>
-
                   <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '800', display: 'block', marginBottom: '0.25rem' }}>Gemini API Key</label>
-                    <input
-                      type="password"
-                      placeholder="輸入 Gemini API Key"
-                      value={settings.gemini_api_key}
-                      onChange={(e) => setSettings({ ...settings, gemini_api_key: e.target.value })}
-                      style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius)', border: '2px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box', outline: 'none' }}
-                    />
+                    <strong>2. {t('zh' === language ? '開啟擴充功能' : 'Open Extension')}</strong>
+                    <div style={{ color: 'var(--color-secondary)', fontSize: '0.75rem' }}>
+                      {t('zh' === language ? '打開 GetaJob 擴充功能視窗。' : 'Open GetaJob Chrome Extension popup window.')}
+                    </div>
                   </div>
-
                   <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '800', display: 'block', marginBottom: '0.25rem' }}>OpenAI API Key</label>
-                    <input
-                      type="password"
-                      placeholder="輸入 OpenAI API Key"
-                      value={settings.openai_api_key}
-                      onChange={(e) => setSettings({ ...settings, openai_api_key: e.target.value })}
-                      style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius)', border: '2px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box', outline: 'none' }}
-                    />
+                    <strong>3. {t('zh' === language ? '點選開始抓取' : 'Start Scraping')}</strong>
+                    <div style={{ color: 'var(--color-secondary)', fontSize: '0.75rem' }}>
+                      {t('zh' === language ? '勾選平台並點選「開始抓取職缺」，擴充功能會自動同步您的偏好並執行全站深度抓取！' : 'Check platforms, click "Start Scraping". It will sync your preferences and scrape.')}
+                    </div>
                   </div>
-
-                  <div>
-                    <label style={{ fontSize: '0.75rem', fontWeight: '800', display: 'block', marginBottom: '0.25rem' }}>Claude API Key</label>
-                    <input
-                      type="password"
-                      placeholder="輸入 Claude/Anthropic API Key"
-                      value={settings.anthropic_api_key}
-                      onChange={(e) => setSettings({ ...settings, anthropic_api_key: e.target.value })}
-                      style={{ width: '100%', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius)', border: '2px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--text-primary)', fontSize: '0.85rem', boxSizing: 'border-box', outline: 'none' }}
-                    />
-                  </div>
-
-                  <button onClick={handleSaveSettings} className="glass-btn" style={{ width: '100%', marginTop: '0.5rem' }}>儲存設定</button>
                 </div>
               </div>
 
@@ -640,7 +536,7 @@ export default function Dashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                   <h1 style={{ fontSize: '1.6rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '800' }}>
-                    💼 追蹤的職缺職位
+                    💼 {t('trackedJobs')}
                   </h1>
                   
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -650,7 +546,7 @@ export default function Dashboard() {
                       className="glass-btn"
                       style={{ fontWeight: '700', border: '2px solid #818cf8', color: '#818cf8', background: 'rgba(129, 140, 248, 0.05)', boxShadow: '3px 3px 0px #818cf8' }}
                     >
-                      {isAiRecommending ? '評估推薦中...' : '✨ AI 推薦排序'}
+                      {isAiRecommending ? t('aiSorting') : t('aiSortButton')}
                     </button>
                     <button
                       onClick={() => {
@@ -661,7 +557,7 @@ export default function Dashboard() {
                       className="glass-btn"
                       style={{ fontWeight: '700', border: '2px solid var(--color-accent)', color: 'var(--color-accent)', background: 'rgba(74, 122, 150, 0.05)', boxShadow: '3px 3px 0px var(--color-accent)' }}
                     >
-                      ＋ 手動新增職缺
+                      {t('manualAddButton')}
                     </button>
                   </div>
                 </div>
@@ -674,30 +570,30 @@ export default function Dashboard() {
                       onClick={() => setViewMode('grid')}
                       style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', border: 'none', background: viewMode === 'grid' ? 'var(--color-accent)' : 'transparent', color: '#fff', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', outline: 'none' }}
                     >
-                      🎴 網格
+                      🎴 {t('zh' === language ? '網格' : 'Grid')}
                     </button>
                     <button
                       onClick={() => setViewMode('list')}
                       style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', border: 'none', background: viewMode === 'list' ? 'var(--color-accent)' : 'transparent', color: '#fff', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', outline: 'none' }}
                     >
-                      ☰ 條列
+                      ☰ {t('zh' === language ? '條列' : 'List')}
                     </button>
                     <button
                       onClick={() => { setViewMode('swipe'); setSwipeIndex(0); }}
                       style={{ padding: '0.25rem 0.6rem', borderRadius: '4px', border: 'none', background: viewMode === 'swipe' ? 'var(--bauhaus-red)' : 'transparent', color: '#fff', fontSize: '0.75rem', fontWeight: '800', cursor: 'pointer', outline: 'none' }}
                       title="快速左右滑動/刪除職缺"
                     >
-                      🔥 左右汰選
+                      🔥 {t('zh' === language ? '左右汰選' : 'Swipe Vetting')}
                     </button>
                   </div>
                   <input
-                    placeholder="篩選職稱 / 公司 / 描述..."
+                    placeholder={t('filterPlaceholder')}
                     value={filterKeyword}
                     onChange={(e) => setFilterKeyword(e.target.value)}
                     style={{ flex: 1.5, minWidth: '150px', padding: '0.35rem 0.6rem', borderRadius: '6px', border: '2px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--text-primary)', fontSize: '0.8rem', outline: 'none' }}
                   />
                   <input
-                    placeholder="篩選地區..."
+                    placeholder={t('filterLocationPlaceholder')}
                     value={filterLocation}
                     onChange={(e) => setFilterLocation(e.target.value)}
                     style={{ flex: 1, minWidth: '100px', padding: '0.35rem 0.6rem', borderRadius: '6px', border: '2px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--text-primary)', fontSize: '0.8rem', outline: 'none' }}
@@ -707,21 +603,21 @@ export default function Dashboard() {
                     onChange={(e) => setFilterStatus(e.target.value)}
                     style={{ minWidth: '100px', padding: '0.35rem 0.5rem', borderRadius: '6px', border: '2px solid var(--glass-border)', background: '#2e303f', color: '#fff', fontSize: '0.8rem', outline: 'none' }}
                   >
-                    <option value="All">全部狀態</option>
-                    <option value="Interested">有興趣</option>
-                    <option value="Applied">已申請</option>
-                    <option value="Interviewing">面試中</option>
-                    <option value="Offered">已錄取</option>
-                    <option value="Rejected">被拒絕</option>
+                    <option value="All">{t('allStatus')}</option>
+                    <option value="Interested">{t('interested')}</option>
+                    <option value="Applied">{t('applied')}</option>
+                    <option value="Interviewing">{t('interviewing')}</option>
+                    <option value="Offered">{t('offered')}</option>
+                    <option value="Rejected">{t('rejected')}</option>
                   </select>
                 </div>
               </div>
 
               {filteredJobs.length === 0 ? (
                 <div className="glass-card" style={{ textAlign: 'center', padding: '4rem 2rem' }}>
-                  <h3 style={{ margin: 0, fontSize: '1.2rem' }}>目前無相符職缺。</h3>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem' }}>{t('noJobs')}</h3>
                   <p style={{ color: 'var(--color-secondary)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-                    請先透過爬蟲搜尋匯入，或點選手動新增按鈕加入您的第一筆追蹤職缺！
+                    {t('noJobsSub')}
                   </p>
                 </div>
               ) : viewMode === 'swipe' ? (

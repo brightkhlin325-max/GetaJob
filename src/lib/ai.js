@@ -21,30 +21,28 @@ export async function parseResume(buffer, apiKey = null) {
     }
   } catch (e) {}
 
-  // 1. Extract raw text first
-  let rawText = '';
-  if (isPdf) {
+  // Resolve API key for Gemini if not passed but Gemini is the provider
+  let activeApiKey = apiKey;
+  if (!activeApiKey && provider === 'gemini') {
     try {
-      const data = await pdfParse(buffer);
-      rawText = data.text || '';
-      if (!rawText.trim()) {
-        rawText = buffer.toString('utf8');
+      const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('gemini_api_key');
+      if (row && row.value) {
+        try {
+          activeApiKey = JSON.parse(row.value);
+        } catch (e) {
+          activeApiKey = row.value;
+        }
       }
-    } catch (e) {
-      console.warn('pdf-parse failed, treating buffer as plain text');
-      rawText = buffer.toString('utf8');
-    }
-  } else {
-    rawText = buffer.toString('utf8');
+    } catch (e) {}
   }
 
-  // 2. Extract structure using the active LLM if keys are configured
-  let structure = { name: '', contact: '', sections: {} };
-  try {
-    // Direct PDF extraction with Gemini 2.5 Flash if selected
-    if (isPdf && provider === 'gemini' && apiKey) {
+  // 1. Direct PDF extraction with Gemini 2.5 Flash if selected and is PDF
+  if (isPdf && provider === 'gemini' && activeApiKey) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
       const base64Data = buffer.toString('base64');
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${activeApiKey}`;
       const payload = {
         contents: [
           {
@@ -69,23 +67,54 @@ export async function parseResume(buffer, apiKey = null) {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         const data = await response.json();
-        const content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        let content = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (content) {
+          // Strip markdown blocks if returned
+          content = content.replace(/```json/i, '').replace(/```/g, '').trim();
           const parsedRes = JSON.parse(content);
           return {
-            rawText: parsedRes.rawText || rawText,
-            structure: parsedRes.structure || structure
+            rawText: parsedRes.rawText || '',
+            structure: parsedRes.structure || { name: '', contact: '', sections: {} }
           };
         }
+      } else {
+        const errText = await response.text();
+        console.warn(`Gemini direct PDF parser failed: ${response.status} - ${errText}`);
       }
+    } catch (err) {
+      clearTimeout(timeoutId);
+      console.error('Gemini direct PDF parser threw error, falling back to pdf-parse:', err);
     }
+  }
 
-    // Generic LLM-based text-to-JSON structure parsing (for OpenAI / Claude / Gemini text inputs)
+  // 2. Fallback / OpenAI / Claude path: Extract raw text using pdf-parse first
+  let rawText = '';
+  if (isPdf) {
+    try {
+      const data = await pdfParse(buffer);
+      rawText = data.text || '';
+      if (!rawText.trim()) {
+        rawText = buffer.toString('utf8');
+      }
+    } catch (e) {
+      console.warn('pdf-parse failed, treating buffer as plain text');
+      rawText = buffer.toString('utf8');
+    }
+  } else {
+    rawText = buffer.toString('utf8');
+  }
+
+  // 3. Extract structure using the active LLM
+  let structure = { name: '', contact: '', sections: {} };
+  try {
     if (rawText.trim()) {
       const prompt = `
 You are a professional resume parser.
@@ -107,7 +136,7 @@ ${rawText}
     console.error('LLM structure extraction failed, falling back to naive parsing:', err);
   }
 
-  // Naive structure extraction as fallback
+  // 4. Naive structure extraction as final fallback
   const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
   structure = {
     name: lines[0] || '',

@@ -137,3 +137,18 @@ input:focus, textarea:focus, select:focus {
   outline: none;
   box-shadow: 0 0 0 2px var(--color-accent);
 }
+
+/* Inline spinner for buttons */
+.spinner-inline {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin-inline 0.8s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin-inline {
+  to { transform: rotate(360deg); }
+}
