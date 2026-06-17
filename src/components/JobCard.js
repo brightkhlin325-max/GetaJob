@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { PencilIcon, TrashIcon, SparklesIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
 
-export default function JobCard({ job, onEdit, onDelete, onAnalyze, onViewCoverLetter, viewMode = 'grid' }) {
+export default function JobCard({ job, onEdit, onDelete, onAnalyze, onViewCoverLetter, viewMode = 'grid', onStatusChange }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   // Helper to determine match score colors based on Bauhaus palette
   const getScoreColor = (score) => {
@@ -30,79 +31,86 @@ export default function JobCard({ job, onEdit, onDelete, onAnalyze, onViewCoverL
 
   if (viewMode === 'list') {
     return (
-      <div className="glass-card" style={{ padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', minHeight: 'auto', width: '100%', boxSizing: 'border-box' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, minWidth: 0 }}>
-          {/* Score Badge */}
-          {hasScore ? (
-            <div style={{ position: 'relative', width: '40px', height: '40px', flexShrink: 0 }}>
-              <svg width="40" height="40" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="20" cy="20" r="16" fill="transparent" stroke="rgba(255, 255, 255, 0.06)" strokeWidth="3" />
-                <circle
-                  cx="20"
-                  cy="20"
-                  r="16"
-                  fill="transparent"
-                  stroke={getScoreColor(score)}
-                  strokeWidth="3"
-                  strokeDasharray={2 * Math.PI * 16}
-                  strokeDashoffset={2 * Math.PI * 16 - (score / 100) * (2 * Math.PI * 16)}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div style={{ position: 'absolute', top: 0, left: 0, width: '40px', height: '40px', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '0.65rem', fontWeight: '800', color: '#f8fafc' }}>
-                {score}%
-              </div>
-            </div>
+      <div 
+        className="glass-card" 
+        style={{ padding: '0.75rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', minHeight: 'auto', width: '100%', boxSizing: 'border-box', transition: 'all 0.2s ease-in-out' }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Job Info (Left) */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', flex: 1, minWidth: 0 }}>
+          {job.url ? (
+            <a href={job.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }} title={job.title}>
+              <h3 className="job-title-link" style={{ margin: 0, fontSize: '1rem', fontWeight: '800', color: 'var(--color-accent)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {job.title}
+              </h3>
+            </a>
           ) : (
-            <div style={{ width: '40px', height: '40px', borderRadius: '50%', border: '2px dashed var(--glass-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', color: 'var(--color-secondary)' }}>
-              無
-            </div>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '800', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={job.title}>
+              {job.title}
+            </h3>
           )}
 
-          {/* Job Info */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              {job.url ? (
-                <a href={job.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-                  <h3 className="job-title-link" style={{ margin: 0, fontSize: '0.95rem', fontWeight: '700', color: 'var(--color-accent)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {job.title}
-                  </h3>
-                </a>
-              ) : (
-                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {job.title}
-                </h3>
-              )}
-              <span style={{ fontSize: '0.75rem', color: 'var(--color-secondary)', fontWeight: '600' }}>
-                {job.company}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.2rem', alignItems: 'center', flexWrap: 'wrap' }}>
-              {job.location && <span style={{ fontSize: '0.7rem', color: 'var(--color-secondary)' }}>📍 {job.location}</span>}
-              {job.salary && <span style={{ fontSize: '0.7rem', color: 'var(--color-secondary)' }}>💰 {job.salary}</span>}
-              {job.source && (
-                <span style={{ fontSize: '0.7rem', background: 'rgba(74, 122, 150, 0.08)', color: 'var(--color-accent)', padding: '0.05rem 0.3rem', borderRadius: '3px' }}>
-                  {job.source}
-                </span>
-              )}
-            </div>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap', minHeight: '1.2rem' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: '700' }}>
+              {job.company}
+            </span>
+            
+            {/* Hover to reveal secondary info */}
+            {isHovered && (
+              <>
+                {job.source && (
+                  <span style={{ fontSize: '0.7rem', background: 'rgba(74, 122, 150, 0.08)', color: 'var(--color-accent)', padding: '0.05rem 0.3rem', borderRadius: '3px' }}>
+                    {job.source}
+                  </span>
+                )}
+                {job.location && <span style={{ fontSize: '0.7rem', color: 'var(--color-secondary)' }}>📍 {job.location}</span>}
+                {job.salary && <span style={{ fontSize: '0.7rem', color: 'var(--color-secondary)' }}>💰 {job.salary}</span>}
+              </>
+            )}
           </div>
         </div>
 
-        {/* Actions & Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexShrink: 0 }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--color-secondary)', fontWeight: '600', background: 'rgba(255,255,255,0.03)', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--glass-border)' }}>
-            {translateStatus(job.status)}
-          </span>
+        {/* Actions & Status (Right) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexShrink: 0 }}>
+          
+          {/* Hover to reveal AI info */}
+          {isHovered && hasScore && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', fontWeight: '800', color: getScoreColor(score), marginRight: '0.5rem' }}>
+              <SparklesIcon className="h-4 w-4" /> {score}%
+            </div>
+          )}
 
-          <div style={{ display: 'flex', gap: '0.25rem' }}>
-            {onAnalyze && (
+          {/* Inline Status Select */}
+          <select 
+            value={job.status}
+            onChange={(e) => onStatusChange && onStatusChange(job.id, e.target.value)}
+            style={{ 
+              fontSize: '0.75rem', 
+              color: 'var(--color-secondary)', 
+              fontWeight: '700', 
+              background: 'rgba(255,255,255,0.05)', 
+              padding: '0.2rem 0.4rem', 
+              borderRadius: '4px', 
+              border: '1px solid var(--glass-border)',
+              cursor: 'pointer',
+              outline: 'none'
+            }}
+          >
+            <option value="Interested">有興趣</option>
+            <option value="Applied">已申請</option>
+            <option value="Interviewing">面試中</option>
+            <option value="Offered">已錄取</option>
+            <option value="Rejected">被拒絕</option>
+          </select>
+
+          <div style={{ display: 'flex', gap: '0.25rem', borderLeft: '1px solid var(--glass-border)', paddingLeft: '0.75rem', minWidth: isHovered ? 'auto' : '60px', justifyContent: 'flex-end' }}>
+            {isHovered && onAnalyze && (
               <button onClick={() => onAnalyze(job)} title="AI 媒合分析" style={{ background: 'none', border: 'none', color: '#818cf8', cursor: 'pointer', padding: '0.2rem' }}>
                 <SparklesIcon className="h-4.5 w-4.5" />
               </button>
             )}
-            {onViewCoverLetter && (
+            {isHovered && onViewCoverLetter && (
               <button onClick={() => onViewCoverLetter(job)} title="求職信" style={{ background: 'none', border: 'none', color: 'var(--color-accent)', cursor: 'pointer', padding: '0.2rem' }}>
                 <DocumentTextIcon className="h-4.5 w-4.5" />
               </button>
@@ -124,18 +132,18 @@ export default function JobCard({ job, onEdit, onDelete, onAnalyze, onViewCoverL
   }
 
   return (
-    <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '190px' }}>
+    <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
           {/* Clickable Job Title Link */}
           {job.url ? (
-            <a href={job.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }}>
-              <h3 className="job-title-link" style={{ margin: 0, fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-accent)', cursor: 'pointer' }}>
+            <a href={job.url} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none' }} title={job.title}>
+              <h3 className="job-title-link" style={{ margin: 0, fontSize: '1.05rem', fontWeight: '700', color: 'var(--color-accent)', cursor: 'pointer', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                 {job.title}
               </h3>
             </a>
           ) : (
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={job.title}>
               {job.title}
             </h3>
           )}

@@ -29,7 +29,7 @@
   --color-bg: #121212;
   --color-primary: #f8fafc;
   --color-secondary: #cbd5e1;
-  --color-accent: #5c8fbb;
+  --color-accent: #93c5fd; /* Lighter blue for high contrast on dark bg */
   --glass-bg: #1e1e1e;
   --glass-border: #f8fafc;
   --glass-shadow: 5px 5px 0px #f8fafc;

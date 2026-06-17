@@ -7,7 +7,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // UI Elements for Automated Crawler
   const prefDetails = document.getElementById('pref-details');
-  const crawlStartBtn = document.getElementById('crawl-start-btn');
+  const crawlNewBtn = document.getElementById('crawl-new-btn');
+  const crawlHistoryBtn = document.getElementById('crawl-history-btn');
   const crawlStopBtn = document.getElementById('crawl-stop-btn');
   const crawlLog = document.getElementById('crawl-log');
 
@@ -16,11 +17,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   const chkLinkedIn = document.getElementById('chk-linkedin');
   const chk1111 = document.getElementById('chk-1111');
 
+  // Progress Labels and Reset Buttons
+  const lblPage104 = document.getElementById('lbl-page-104');
+  const lblPageCake = document.getElementById('lbl-page-cake');
+  const lblPageLinkedIn = document.getElementById('lbl-page-linkedin');
+  const lblPage1111 = document.getElementById('lbl-page-1111');
+
+  const btnReset104 = document.getElementById('btn-reset-104');
+  const btnResetCake = document.getElementById('btn-reset-cake');
+  const btnResetLinkedIn = document.getElementById('btn-reset-linkedin');
+  const btnReset1111 = document.getElementById('btn-reset-1111');
+
   let activeTab = null;
   let backendUrl = 'http://localhost:3000';
   let targetPosition = '';
   let targetLocations = [];
   let isCrawling = false;
+  let crawlMode = 'new'; // 'new' or 'history'
+  let pageOffsets = {
+    '104': 0,
+    'cake': 0,
+    'linkedin': 0,
+    '1111': 0
+  };
 
   // Helper to show status msg
   function showStatus(text, type) {
@@ -36,6 +55,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Random jitter sleep between 1500-3000ms to evade anti‑ban detection
+function randomSleep() {
+  const jitter = 1500 + Math.random() * 1500; // 1500‑3000 ms
+  return sleep(jitter);
+}
+
+// Batch cool‑down: after every 5 detail requests, pause for 5 seconds
+let detailRequestCount = 0;
+async function maybeCooldown() {
+  detailRequestCount++;
+  if (detailRequestCount % 5 === 0) {
+    await sleep(5000); // 5‑second cool‑down
+  }
+}
 
   // Determine backend and sync settings
   async function syncPreferences() {
@@ -67,36 +101,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.warn(`Failed to connect to ${url}:`, e);
       }
     }
-
     if (success && settings) {
-      if (settings.target_position) {
-        targetPosition = settings.target_position;
-        
-        if (Array.isArray(settings.target_locations)) {
-          targetLocations = settings.target_locations;
-        } else if (typeof settings.target_locations === 'string') {
-          try {
-            targetLocations = JSON.parse(settings.target_locations);
-            if (!Array.isArray(targetLocations)) {
-              targetLocations = [targetLocations];
+        if (settings.target_position) {
+          targetPosition = settings.target_position;
+          
+          if (Array.isArray(settings.target_locations)) {
+            targetLocations = settings.target_locations;
+          } else if (typeof settings.target_locations === 'string') {
+            try {
+              targetLocations = JSON.parse(settings.target_locations);
+              if (!Array.isArray(targetLocations)) {
+                targetLocations = [targetLocations];
+              }
+            } catch (e) {
+              targetLocations = settings.target_locations.split(',').map(s => s.trim()).filter(Boolean);
             }
-          } catch (e) {
-            targetLocations = settings.target_locations.split(',').map(s => s.trim()).filter(Boolean);
+          } else {
+            targetLocations = [];
           }
+          
+          // Load saved page offsets if present (stored as last_page_*)
+          const platforms = ['104', 'cake', 'linkedin', '1111'];
+          platforms.forEach(p => {
+            const key = `last_page_${p}`;
+            if (settings[key]) {
+              const offset = parseInt(settings[key], 10) || 0;
+              pageOffsets[p] = offset;
+              const labelEl = document.getElementById(`lbl-page-${p}`);
+              if (labelEl) labelEl.textContent = offset;
+            }
+          });
+          
+          prefDetails.innerHTML = `職稱: <span style="color:var(--color-accent); font-weight:700;">${targetPosition}</span><br/>地點: <span style="color:var(--color-accent); font-weight:700;">${targetLocations.join(', ')}</span>`;
+          crawlNewBtn.removeAttribute('disabled');
+          crawlHistoryBtn.removeAttribute('disabled');
+          log('求職偏好載入成功。');
         } else {
-          targetLocations = [];
+          prefDetails.innerHTML = '<span style="color:var(--bauhaus-red);">請先在網頁端儲存目標職位偏好！</span>';
         }
-        
-        prefDetails.innerHTML = `職稱: <span style="color:var(--color-accent); font-weight:700;">${targetPosition}</span><br/>地點: <span style="color:var(--color-accent); font-weight:700;">${targetLocations.join(', ')}</span>`;
-        crawlStartBtn.removeAttribute('disabled');
-        log('求職偏好載入成功。');
-      } else {
-        prefDetails.innerHTML = '<span style="color:var(--bauhaus-red);">請先在網頁端儲存目標職位偏好！</span>';
-        crawlStartBtn.setAttribute('disabled', 'true');
-      }
     } else {
       prefDetails.innerHTML = '<span style="color:var(--bauhaus-red);">無法連線至 GetaJob 伺服器</span>';
-      crawlStartBtn.setAttribute('disabled', 'true');
       log('後台同步失敗，請確認 GetaJob 首頁已開啟並在運行。');
     }
   }
@@ -239,7 +283,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!match) return '';
       const jobId = match[1];
       const res = await fetch(`https://www.104.com.tw/job/ajax/content/${jobId}`, {
-        headers: { 'Referer': `https://www.104.com.tw/job/${jobId}` }
+        headers: { 
+          'Referer': `https://www.104.com.tw/job/${jobId}`,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        credentials: 'include'
       });
       if (!res.ok) return '';
       const data = await res.json();
@@ -260,14 +308,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const areaParam = areaCodes.length > 0 ? `&area=${areaCodes.join(',')}` : '';
 
-    for (let page = 1; page <= 3; page++) {
+    const MAX_PAGES = 150;
+    const startPage = (crawlMode === 'new') ? 1 : (pageOffsets['104'] + 1);
+    let consecutiveAllDupPages = 0;
+
+    for (let page = startPage; page <= MAX_PAGES; page++) {
       if (window.abortCrawling) return;
       log(`104 載入第 ${page} 頁列表...`);
-      const listUrl = `https://c104.api.104.com.tw/web-api-sf/job/search?ro=0&kw=${encodeURIComponent(targetPosition)}&isnew=3&mode=s&page=${page}${areaParam}`;
-      
+      const listUrl = `https://www.104.com.tw/jobs/search/list?ro=0&kw=${encodeURIComponent(targetPosition)}&isnew=3&mode=s&page=${page}${areaParam}`;
+
       let res, data;
       try {
-        res = await fetch(listUrl);
+        res = await fetch(listUrl, {
+          headers: { 
+            'Referer': 'https://www.104.com.tw/jobs/search/',
+            'Accept': 'application/json, text/plain, */*',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          credentials: 'include'
+        });
         if (!res.ok) {
           log(`104 載入失敗 (HTTP ${res.status})，可能已被防爬蟲機制阻擋。`);
           break;
@@ -282,6 +341,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (list.length === 0) { log('104 無更多職缺。'); break; }
 
       let matchCount = 0;
+      let newCount = 0;
       for (const item of list) {
         if (window.abortCrawling) return;
         const title = cleanHtmlText(item.jobName);
@@ -298,8 +358,9 @@ document.addEventListener('DOMContentLoaded', async () => {
           continue;
         }
 
+        newCount++;
         log(`104 擷取詳情: ${item.custName} - ${title}`);
-        
+
         const description = await get104Details(jobUrl);
         const jobPayload = {
           title,
@@ -318,143 +379,252 @@ document.addEventListener('DOMContentLoaded', async () => {
           log(`  [匯入失敗] ${item.custName}`);
         }
 
-        await sleep(800); // polite delay
+        await randomSleep();
+        await maybeCooldown();
       }
+
+      // Update offset
+      pageOffsets['104'] = page;
+      lblPage104.textContent = page;
+      fetch(`${backendUrl}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ last_page_104: String(page) })
+      }).catch(e => console.warn('Failed to persist 104 offset', e));
+
       if (matchCount === 0) log(`104 第 ${page} 頁無相符職缺。`);
-      await sleep(1000);
+
+      // Smart termination for 'new' mode
+      if (crawlMode === 'new') {
+        if (matchCount > 0 && newCount === 0) {
+          consecutiveAllDupPages++;
+          log(`  (連續 ${consecutiveAllDupPages}/3 頁全重複)`);
+          if (consecutiveAllDupPages >= 3) {
+            log('104 連續 3 頁皆為重複職缺，停止往後翻頁。');
+            break;
+          }
+        } else {
+          consecutiveAllDupPages = 0;
+        }
+      }
+
+      await randomSleep();
     }
   }
 
   async function getCakeDetails(jobUrl) {
     try {
       const res = await fetch(jobUrl);
-      if (!res.ok) return '';
+      if (!res.ok) return { description: '', company: '' };
       const html = await res.text();
       const dom = new DOMParser().parseFromString(html, 'text/html');
-      
-      // Cake content parser
+
+      // Try extracting company from __NEXT_DATA__ JSON on detail page
+      let company = '';
+      const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+      if (nextDataMatch && nextDataMatch[1]) {
+        try {
+          const parsed = JSON.parse(nextDataMatch[1]);
+          const jobData = parsed?.props?.pageProps?.job || parsed?.props?.pageProps?.jobPosting || {};
+          company = jobData?.page?.name || jobData?.company?.name || jobData?.companyName || '';
+        } catch (e) { /* ignore */ }
+      }
+
+      // Fallback: try meta tags or DOM selectors for company name
+      if (!company) {
+        const metaCompany = dom.querySelector('meta[property="og:site_name"]');
+        if (metaCompany && metaCompany.content !== 'CakeResume' && metaCompany.content !== 'Cake') {
+          company = metaCompany.content;
+        }
+      }
+      if (!company) {
+        // Try common Cake company name selectors
+        const companyEl = dom.querySelector('[class*="CompanyName"]') ||
+                          dom.querySelector('[class*="company-name"]') ||
+                          dom.querySelector('[class*="company_name"]') ||
+                          dom.querySelector('a[href*="/companies/"]');
+        if (companyEl) company = cleanHtmlText(companyEl.textContent);
+      }
+
+      // Extract description
+      let description = '';
       const descEl = dom.querySelector('.job-description') || dom.querySelector('[class*="JobDescription"]') || dom.querySelector('[class*="description"]');
-      if (descEl) return cleanHtmlText(descEl.innerHTML);
-      return cleanHtmlText(html).slice(0, 1000);
+      if (descEl) {
+        description = cleanHtmlText(descEl.innerHTML);
+      } else {
+        description = cleanHtmlText(html).slice(0, 1000);
+      }
+
+      return { description, company };
     } catch (e) {
-      return '';
+      return { description: '', company: '' };
     }
   }
 
   async function runCakeScraper() {
     log('開始爬取 Cake...');
-    const searchUrl = `https://www.cake.me/jobs?q=${encodeURIComponent(targetPosition)}`;
-    
-    let res, html;
-    try {
-      res = await fetch(searchUrl);
-      if (!res.ok) {
-        log(`Cake 載入失敗 (HTTP ${res.status})，可能已被防爬蟲機制阻擋。`);
-        return;
-      }
-      html = await res.text();
-    } catch (err) {
-      log(`Cake 載入出錯: ${err.message}`);
-      return;
-    }
+    const MAX_PAGES = 100;
+    const startPage = (crawlMode === 'new') ? 1 : (pageOffsets['cake'] + 1);
+    let consecutiveAllDupPages = 0;
 
-    const jsonMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-    let jobs = [];
+    for (let page = startPage; page <= MAX_PAGES; page++) {
+      if (window.abortCrawling) return;
+      log(`Cake 載入第 ${page} 頁...`);
+      const searchUrl = `https://www.cake.me/jobs?q=${encodeURIComponent(targetPosition)}&page=${page}`;
 
-    if (jsonMatch && jsonMatch[1]) {
+      let res, html;
       try {
-        const parsed = JSON.parse(jsonMatch[1]);
-        const hits = parsed?.props?.pageProps?.initialState?.algoliaJobs?.hits || 
-                     parsed?.props?.pageProps?.initialJobSearchResponse?.results?.[0]?.hits || [];
-        
-        for (const hit of hits) {
-          const rawLoc = hit.location || hit.flat_locations?.join(', ') || '';
-          
-          // Location filter
-          let isLocMatch = targetLocations.includes('台灣 (不限縣市)') || targetLocations.length === 0;
-          if (!isLocMatch) {
-            for (const loc of targetLocations) {
-              const cleanCity = loc.replace('市', '').replace('縣', '');
-              if (rawLoc.includes(cleanCity)) { isLocMatch = true; break; }
-            }
-          }
-          if (!isLocMatch) continue;
+        res = await fetch(searchUrl);
+        if (!res.ok) {
+          log(`Cake 載入失敗 (HTTP ${res.status})，可能已被防爬蟲機制阻擋。`);
+          break;
+        }
+        html = await res.text();
+      } catch (err) {
+        log(`Cake 載入出錯: ${err.message}`);
+        break;
+      }
 
-          const title = cleanHtmlText(hit.title);
-          if (!isTitleRelevant(title, targetPosition)) continue;
+      const jsonMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+      let jobs = [];
+
+      let rawJobsCount = 0;
+
+      if (jsonMatch && jsonMatch[1]) {
+        try {
+          const parsed = JSON.parse(jsonMatch[1]);
+          const hits = parsed?.props?.pageProps?.initialState?.algoliaJobs?.hits ||
+                       parsed?.props?.pageProps?.initialJobSearchResponse?.results?.[0]?.hits || [];
+          rawJobsCount += hits.length;
+
+          for (const hit of hits) {
+            const rawLoc = hit.location || hit.flat_locations?.join(', ') || '';
+
+            let isLocMatch = targetLocations.includes('台灣 (不限縣市)') || targetLocations.length === 0;
+            if (!isLocMatch) {
+              for (const loc of targetLocations) {
+                const cleanCity = loc.replace('市', '').replace('縣', '');
+                if (rawLoc.includes(cleanCity)) { isLocMatch = true; break; }
+              }
+            }
+            if (!isLocMatch) continue;
+
+            const title = cleanHtmlText(hit.title);
+            if (!isTitleRelevant(title, targetPosition)) continue;
+
+            jobs.push({
+              title,
+              company: cleanHtmlText(hit.page?.name || hit.companyName || 'Cake Company'),
+              location: cleanHtmlText(rawLoc),
+              salary: cleanHtmlText(hit.salary_range || ''),
+              url: hit.path ? `https://www.cake.me/jobs/${hit.path}` : `https://www.cake.me/jobs/${hit.uuid}`,
+              description: cleanHtmlText(hit.description || hit.description_plain || ''),
+              source: 'Cake'
+            });
+          }
+        } catch (e) {
+          log('Algolia JSON 解析異常，啟用備用 RegExp 剖析器。');
+        }
+      }
+
+      // Backup regex parser
+      if (rawJobsCount === 0) {
+        const titleMatches = [...html.matchAll(/<a[^>]*href="([^"]*\/(?:[a-zA-Z]{2}\/)?jobs\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
+        rawJobsCount += titleMatches.length;
+        for (const match of titleMatches) {
+          if (window.abortCrawling) return;
+          let jobUrl = match[1];
+          if (!jobUrl.startsWith('http')) {
+            jobUrl = `https://www.cake.me${jobUrl.startsWith('/') ? '' : '/'}${jobUrl}`;
+          }
+
+          if (jobUrl.match(/\/jobs\/(zh-TW|zh-CN|en|ja|companies|categories|collections|search)(?:\?|\/|$)/i)) continue;
+          const pathSegments = jobUrl.split(/\/jobs\//)[1]?.split('/') || [];
+          if (pathSegments.length < 1) continue;
+
+          const titleText = cleanHtmlText(match[2]);
+          if (!titleText || titleText.length > 80 || !isTitleRelevant(titleText, targetPosition)) continue;
+
+          let company = 'Cake Company';
+          if (pathSegments.length >= 2) {
+            company = pathSegments[0].split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+          }
 
           jobs.push({
-            title,
-            company: cleanHtmlText(hit.page?.name || hit.companyName || 'Cake Company'),
-            location: cleanHtmlText(rawLoc),
-            salary: cleanHtmlText(hit.salary_range || ''),
-            url: hit.path ? `https://www.cake.me/jobs/${hit.path}` : `https://www.cake.me/jobs/${hit.uuid}`,
-            description: cleanHtmlText(hit.description || hit.description_plain || ''),
+            title: titleText,
+            company,
+            location: '雙北市',
+            salary: '',
+            url: jobUrl,
+            description: '',
             source: 'Cake'
           });
         }
-      } catch (e) {
-        log('Algolia JSON 解析異常，啟用備用 RegExp 剖析器。');
-      }
-    }
-
-    // Backup regex parser
-    if (jobs.length === 0) {
-      const titleMatches = html.matchAll(/<a[^>]*href="([^"]*\/(?:[a-zA-Z]{2}\/)?jobs\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi);
-      for (const match of titleMatches) {
-        if (window.abortCrawling) return;
-        let jobUrl = match[1];
-        if (!jobUrl.startsWith('http')) {
-          jobUrl = `https://www.cake.me${jobUrl.startsWith('/') ? '' : '/'}${jobUrl}`;
-        }
-        
-        if (jobUrl.match(/\/jobs\/(zh-TW|zh-CN|en|ja|companies|categories|collections|search)(?:\?|\/|$)/i)) continue;
-        const pathSegments = jobUrl.split(/\/jobs\//)[1]?.split('/') || [];
-        if (pathSegments.length < 1) continue;
-
-        const titleText = cleanHtmlText(match[2]);
-        if (!titleText || titleText.length > 80 || !isTitleRelevant(titleText, targetPosition)) continue;
-
-        let company = 'Cake Company';
-        if (pathSegments.length >= 2) {
-          company = pathSegments[0].split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-        }
-
-        jobs.push({
-          title: titleText,
-          company,
-          location: '雙北市',
-          salary: '',
-          url: jobUrl,
-          description: '',
-          source: 'Cake'
-        });
-      }
-    }
-
-    log(`Cake 共偵測到 ${jobs.length} 筆潛在職缺，開始載入詳情...`);
-    for (const job of jobs.slice(0, 25)) {
-      if (window.abortCrawling) return;
-
-      const isDup = await checkDuplicateInBackend(job.url);
-      if (isDup) {
-        log(`  [重複已略過] ${job.company} - ${job.title}`);
-        continue;
       }
 
-      log(`Cake 詳情: ${job.company} - ${job.title}`);
-      
-      if (!job.description) {
-        job.description = await getCakeDetails(job.url);
-      }
-      
-      const postRes = await postJobToBackend(job);
-      if (postRes.success) {
-        log(postRes.duplicated ? `  [重複已略過] ${job.company}` : `  [成功匯入] ${job.company}`);
+      if (rawJobsCount === 0) { log(`Cake 第 ${page} 頁無任何職缺資料。`); break; }
+      if (jobs.length === 0) { 
+        log(`Cake 第 ${page} 頁無符合條件之職缺，繼續下一頁。`); 
       } else {
-        log(`  [匯入失敗] ${job.company}`);
+        log(`Cake 第 ${page} 頁偵測到 ${jobs.length} 筆潛在職缺，開始載入詳情...`);
       }
-      await sleep(1000);
+      
+      let newCount = 0;
+      for (const job of jobs) {
+        if (window.abortCrawling) return;
+
+        const isDup = await checkDuplicateInBackend(job.url);
+        if (isDup) {
+          log(`  [重複已略過] ${job.company} - ${job.title}`);
+          continue;
+        }
+
+        newCount++;
+        log(`Cake 詳情: ${job.company} - ${job.title}`);
+
+        // Always fetch detail page to get accurate company name and description
+        const details = await getCakeDetails(job.url);
+        if (details.company) {
+          job.company = details.company;
+        }
+        if (details.description) {
+          job.description = details.description;
+        }
+
+        const postRes = await postJobToBackend(job);
+        if (postRes.success) {
+          log(postRes.duplicated ? `  [重複已略過] ${job.company}` : `  [成功匯入] ${job.company}`);
+        } else {
+          log(`  [匯入失敗] ${job.company}`);
+        }
+        await randomSleep();
+        await maybeCooldown();
+      }
+
+      // Update offset
+      pageOffsets['cake'] = page;
+      lblPageCake.textContent = page;
+      fetch(`${backendUrl}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ last_page_cake: String(page) })
+      }).catch(e => console.warn('Failed to persist cake offset', e));
+
+      // Smart termination for 'new' mode
+      if (crawlMode === 'new') {
+        if (jobs.length > 0 && newCount === 0) {
+          consecutiveAllDupPages++;
+          log(`  (連續 ${consecutiveAllDupPages}/3 頁全重複)`);
+          if (consecutiveAllDupPages >= 3) {
+            log('Cake 連續 3 頁皆為重複職缺，停止往後翻頁。');
+            break;
+          }
+        } else {
+          consecutiveAllDupPages = 0;
+        }
+      }
+
+      await randomSleep();
     }
   }
 
@@ -484,11 +654,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (hasTaipei) locParam = '&location=Taipei%20Metropolitan%20Area';
     }
 
-    for (let startNum of [0, 25]) {
+    const MAX_PAGES = 40;
+    const ITEMS_PER_PAGE = 10;
+    const startPage = (crawlMode === 'new') ? 0 : pageOffsets['linkedin'];
+    let consecutiveAllDupPages = 0;
+
+    for (let pageIdx = startPage; pageIdx < MAX_PAGES; pageIdx++) {
       if (window.abortCrawling) return;
-      log(`LinkedIn 搜尋起點 ${startNum}...`);
+      const startNum = pageIdx * ITEMS_PER_PAGE;
+      log(`LinkedIn 搜尋起點 ${startNum} (第 ${pageIdx + 1} 頁)...`);
       const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(targetPosition)}${locParam}&start=${startNum}`;
-      
+
       let res, html;
       try {
         res = await fetch(url);
@@ -504,6 +680,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const jobBlocks = html.split('</li>');
       let foundJobs = 0;
+      let newCount = 0;
       for (const block of jobBlocks) {
         if (window.abortCrawling) return;
         if (!block.includes('base-card')) continue;
@@ -528,9 +705,10 @@ document.addEventListener('DOMContentLoaded', async () => {
           continue;
         }
 
+        newCount++;
         log(`LinkedIn 詳情: ${company} - ${title}`);
         const description = await getLinkedInDetails(urlLink);
-        
+
         const jobPayload = {
           title,
           company,
@@ -547,10 +725,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           log(`  [匯入失敗] ${company}`);
         }
-        await sleep(1200); // throttle to avoid heavy LinkedIn WAF block
+        await randomSleep();
+        await maybeCooldown();
       }
-      if (foundJobs === 0) log('LinkedIn 此分段無相符職缺。');
-      await sleep(1500);
+
+      if (!html.includes('base-card')) { log('LinkedIn 該頁無任何職缺資料，結束爬取。'); break; }
+      if (foundJobs === 0) { log('LinkedIn 該頁無符合條件之職缺，繼續下一頁。'); }
+
+      // Update offset
+      pageOffsets['linkedin'] = pageIdx + 1;
+      lblPageLinkedIn.textContent = pageIdx + 1;
+      fetch(`${backendUrl}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ last_page_linkedin: String(pageIdx + 1) })
+      }).catch(e => console.warn('Failed to persist linkedin offset', e));
+
+      // Smart termination for 'new' mode
+      if (crawlMode === 'new') {
+        if (foundJobs > 0 && newCount === 0) {
+          consecutiveAllDupPages++;
+          log(`  (連續 ${consecutiveAllDupPages}/3 頁全重複)`);
+          if (consecutiveAllDupPages >= 3) {
+            log('LinkedIn 連續 3 頁皆為重複職缺，停止往後翻頁。');
+            break;
+          }
+        } else {
+          consecutiveAllDupPages = 0;
+        }
+      }
+
+      await randomSleep();
     }
   }
 
@@ -579,11 +784,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    for (let page = 1; page <= 2; page++) {
+    const MAX_PAGES = 100;
+    const startPage = (crawlMode === 'new') ? 1 : (pageOffsets['1111'] + 1);
+    let consecutiveAllDupPages = 0;
+
+    for (let page = startPage; page <= MAX_PAGES; page++) {
       if (window.abortCrawling) return;
       log(`1111 載入第 ${page} 頁列表...`);
       const searchUrl = `https://www.1111.com.tw/search/job?ks=${encodeURIComponent(augmentedKw)}&page=${page}`;
-      
+
       let res, html;
       try {
         res = await fetch(searchUrl);
@@ -603,6 +812,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (links.length === 0) { log('1111 無更多職缺。'); break; }
 
       let matchCount = 0;
+      let newCount = 0;
       for (const link of links) {
         if (window.abortCrawling) return;
         const rawUrl = link[1];
@@ -612,7 +822,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!isTitleRelevant(title, targetPosition)) continue;
 
         matchCount++;
-        
+
         // Find company snippet
         const jobIndex = html.indexOf(link[0]);
         let company = '1111 雇主';
@@ -628,6 +838,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           continue;
         }
 
+        newCount++;
         log(`1111 擷取詳情: ${company} - ${title}`);
         const description = await get1111Details(jobUrl);
 
@@ -647,10 +858,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
           log(`  [匯入失敗] ${company}`);
         }
-        await sleep(1500); // Increased delay to prevent WAF 403 block on 1111
+        await randomSleep();
+        await maybeCooldown();
       }
+
+      // Update offset
+      pageOffsets['1111'] = page;
+      lblPage1111.textContent = page;
+      fetch(`${backendUrl}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ last_page_1111: String(page) })
+      }).catch(e => console.warn('Failed to persist 1111 offset', e));
+
       if (matchCount === 0) log(`1111 第 ${page} 頁無相符職缺。`);
-      await sleep(1500);
+
+      // Smart termination for 'new' mode
+      if (crawlMode === 'new') {
+        if (matchCount > 0 && newCount === 0) {
+          consecutiveAllDupPages++;
+          log(`  (連續 ${consecutiveAllDupPages}/3 頁全重複)`);
+          if (consecutiveAllDupPages >= 3) {
+            log('1111 連續 3 頁皆為重複職缺，停止往後翻頁。');
+            break;
+          }
+        } else {
+          consecutiveAllDupPages = 0;
+        }
+      }
+
+      await randomSleep();
     }
   }
 
@@ -661,7 +898,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     isCrawling = true;
     window.abortCrawling = false;
 
-    crawlStartBtn.setAttribute('disabled', 'true');
+    crawlNewBtn.setAttribute('disabled', 'true');
+    crawlHistoryBtn.setAttribute('disabled', 'true');
     crawlStopBtn.removeAttribute('disabled');
     chk104.setAttribute('disabled', 'true');
     chkCake.setAttribute('disabled', 'true');
@@ -696,7 +934,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       log(`[錯誤] 爬網過程發生異常：${err.message}`);
     } finally {
       isCrawling = false;
-      crawlStartBtn.removeAttribute('disabled');
+      crawlNewBtn.removeAttribute('disabled');
+      crawlHistoryBtn.removeAttribute('disabled');
       crawlStopBtn.setAttribute('disabled', 'true');
       chk104.removeAttribute('disabled');
       chkCake.removeAttribute('disabled');
@@ -746,8 +985,68 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // Automated Crawling triggers
-  crawlStartBtn.addEventListener('click', startCrawling);
+  // Event listeners for crawl mode buttons
+  crawlNewBtn.addEventListener('click', () => {
+    crawlMode = 'new';
+    // Reset offsets locally and UI
+    ['104', 'cake', 'linkedin', '1111'].forEach(p => {
+      pageOffsets[p] = 0;
+      const label = eval(`lblPage${p.charAt(0).toUpperCase() + p.slice(1)}`);
+      if (label) label.textContent = '0';
+    });
+    startCrawling();
+  });
+
+  crawlHistoryBtn.addEventListener('click', () => {
+    crawlMode = 'history';
+    // Offsets are already loaded via syncPreferences
+    startCrawling();
+  });
+
+  // Reset button handlers
+  btnReset104.addEventListener('click', async (e) => {
+    e.preventDefault();
+    await fetch(`${backendUrl}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ last_page_104: '0' })
+    });
+    lblPage104.textContent = '0';
+    pageOffsets['104'] = 0;
+  });
+  btnResetCake.addEventListener('click', async (e) => {
+    e.preventDefault();
+    await fetch(`${backendUrl}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ last_page_cake: '0' })
+    });
+    lblPageCake.textContent = '0';
+    pageOffsets['cake'] = 0;
+  });
+  btnResetLinkedIn.addEventListener('click', async (e) => {
+    e.preventDefault();
+    await fetch(`${backendUrl}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ last_page_linkedin: '0' })
+    });
+    lblPageLinkedIn.textContent = '0';
+    pageOffsets['linkedin'] = 0;
+  });
+  btnReset1111.addEventListener('click', async (e) => {
+    e.preventDefault();
+    await fetch(`${backendUrl}/api/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ last_page_1111: '0' })
+    });
+    lblPage1111.textContent = '0';
+    pageOffsets['1111'] = 0;
+  });
+
+  // Automated Crawling triggers (legacy start/stop for single‑run UI)
+  // crawlNewBtn and crawlHistoryBtn listeners are already defined above
   crawlStopBtn.addEventListener('click', stopCrawling);
 
   // Initialize

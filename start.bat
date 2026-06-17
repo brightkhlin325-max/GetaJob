@@ -5,9 +5,32 @@ echo Starting GetaJob...
 :: 1. Check Node.js installation
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo Error: Node.js is not installed or not in PATH.
-    exit /b 1
+    echo Node.js is not installed or not in PATH.
+    
+    :: Check for Admin rights
+    net session >nul 2>&1
+    if errorlevel 1 (
+        echo Requesting administrative privileges to install Node.js...
+        powershell -Command "Start-Process '%~dpnx0' -Verb RunAs"
+        exit /b
+    )
+
+    echo Installing Node.js LTS via winget...
+    winget install OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
+    
+    echo =======================================================
+    echo Node.js has been successfully installed!
+    echo However, this command window needs to be refreshed.
+    echo Please press any key to close this window, and then 
+    echo double-click start.bat again to launch the project.
+    echo =======================================================
+    pause
+    exit /b
 )
+
+:: 1.5. Install Dependencies
+echo Installing dependencies...
+call npm install
 
 :: 2. Auto-DB Directory Initialization
 if "%GETAJOB_DB_DIR%"=="" (
